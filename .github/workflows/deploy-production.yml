@@ -1,0 +1,40 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+    - uses: actions/checkout@v1
+    # Deploy the files to the production server
+    - name: 🚀 Deploy to Production server
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.PROD_HOST }}
+        username: ${{ secrets.PROD_USERNAME }}
+        key: ${{ secrets.PROD_SSHKEY }}
+        passphrase: ""
+        source: "./"
+        target: "/var/www/html"
+        strip_components: 1
+
+    - name: 💀 Running update commands
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.PROD_HOST }}
+        username: ${{ secrets.PROD_USERNAME }}
+        key: ${{ secrets.PROD_SSHKEY }}
+        passphrase: ""
+        script: |
+          cd /var/www
+          sudo chown -R www-data:www-data html/
+          cd /var/www/html
+          sudo chmod -R 777 /var/www/html/storage/ # Giving storage the correct permissions
+          composer install -n # Installing any new composer items
+          php artisan migrate # Installing/updating any new tables in the database
+          php artisan cache:clear # Clear cache
+          php artisan config:clear # Clear config cache
